@@ -3,8 +3,10 @@
 import sys
 import os
 
+
 # take care of extra required modules depending on Python version
 extra = {}
+
 
 try:
 	from setuptools import setup
@@ -18,25 +20,28 @@ except ImportError:
 		extra['dependencies'] = ['argparse']
 
 
+def get_static(name, keep=None):
+	""" Determine additional files to include with the package. """
+	pkg_path = os.path.dirname(os.path.realpath(__file__))
+	static = [os.path.join(name, f) for f in
+			  os.listdir(os.path.join(pkg_path, name))]
+	return static if keep is None else list(filter(keep, static))
+
 # Additional files to include with package
-def get_static(name, condition=None):
-	static = [os.path.join(name, f) for f in os.listdir(os.path.join(os.path.dirname(os.path.realpath(__file__)), name))]
-	if condition is None:
-		return static
-	else:
-		return filter(lambda x: eval(condition), static)
+pipeline_configs = get_static("pipelines",
+	keep=lambda fpath: os.path.splitext(fpath)[1] in [".yaml", ".yml"])
+scripts = get_static(
+	os.path.join("pipelines", "tools"), keep=lambda fpath: '.' in fpath)
 
-# looper configs from /config
-looper_configs = get_static("config")
-# pipeline configs from /pipelines/.*\.yaml
-pipeline_configs = get_static("pipelines", condition="'yaml' in x")
 
-# scripts to be added to the $PATH
-scripts = get_static("pipelines/tools", condition="'.' in x")
+with open("VERSION", 'r') as versionfile:
+	version = versionfile.read().strip()
 
-version = open("VERSION").read().strip()
 
-# setup
+with open("requirements-pypi.txt", 'r') as reqs_file:
+	reqs = [l.rstrip() for l in reqs_file.readlines() if not l.startswith("#")]
+
+
 setup(
 	name="pipelines",
 	packages=["pipelines"],
@@ -53,7 +58,7 @@ setup(
 	url="https://github.com/epigen/pipelines",
 	author=u"Nathan Sheffield, Johanna Klughammer, Andre Rendeiro, Charles Dietz",
 	license="GPL2",
-	install_requires=["pyyaml", "pandas"],
+	install_requires=reqs,
 	entry_points={
 		"console_scripts": [
 			'atacseq_pipeline = pipelines.atacseq:main',
@@ -63,9 +68,7 @@ setup(
 		],
 	},
 	scripts=scripts,
-	data_files=[
-		("configs", looper_configs + pipeline_configs)
-	],
+	data_files=[("configs", pipeline_configs)],
 	include_package_data=True,
 	**extra
 )

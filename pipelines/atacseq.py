@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
 ATAC-seq pipeline
@@ -10,7 +10,7 @@ from argparse import ArgumentParser
 import yaml
 import pypiper
 from pypiper.ngstk import NGSTk
-from looper.models import AttributeDict, Sample
+from pep import AttributeDict, Sample
 
 import pandas as pd
 
@@ -25,28 +25,24 @@ __email__ = "arendeiro@cemm.oeaw.ac.at"
 __status__ = "Development"
 
 
+
 class ATACseqSample(Sample):
 	"""
 	Class to model ATAC-seq samples based on the ChIPseqSample class.
 
-	:param series: Pandas `Series` object.
-	:type series: pandas.Series
+	:param series: Collection of sample attributes.
+	:type series: Mapping | pandas.core.series.Series
 	"""
 	__library__ = "ATAC-seq"
 
 	def __init__(self, series):
-
-		# Use pd.Series object to have all sample attributes
-		if not isinstance(series, pd.Series):
-			raise TypeError("Provided object is not a pandas Series.")
 		super(ATACseqSample, self).__init__(series)
-
 		self.tagmented = True
 
 	def __repr__(self):
 		return "ATAC-seq sample '%s'" % self.sample_name
 
-	def set_file_paths(self, project):
+	def set_file_paths(self, project=None):
 		"""
 		Sets the paths of all files for this sample.
 		"""
@@ -97,7 +93,7 @@ class ATACseqSample(Sample):
 		self.qc = os.path.join(self.paths.sample_root, self.name + "_qc.tsv")
 		self.qc_plot = os.path.join(self.paths.sample_root, self.name + "_qc.pdf")
 
-		# Peaks: peaks called and derivate files
+		# Peaks: peaks called and associated files
 		self.paths.peaks = os.path.join(self.paths.sample_root, "peaks")
 		self.peaks = os.path.join(self.paths.peaks, self.name + "_peaks.narrowPeak")
 		self.summits = os.path.join(self.paths.peaks, self.name + "_summits.bed")
@@ -108,23 +104,11 @@ class DNaseSample(ATACseqSample):
 	"""
 	Class to model DNase-seq samples based on the ChIPseqSample class.
 
-	:param series: Pandas `Series` object.
-	:type series: pandas.Series
 	"""
 	__library__ = "DNase-seq"
 
-	def __init__(self, series):
-
-		# Use pd.Series object to have all sample attributes
-		if not isinstance(series, pd.Series):
-			raise TypeError("Provided object is not a pandas Series.")
-		super(DNaseSample, self).__init__(series)
-
 	def __repr__(self):
 		return "DNase-seq sample '%s'" % self.sample_name
-
-	def set_file_paths(self, project):
-		super(DNaseSample, self).set_file_paths(project)
 
 
 def report_dict(pipe, stats_dict):
@@ -427,16 +411,16 @@ def main():
 		description="ATAC-seq pipeline."
 	)
 	parser = arg_parser(parser)
-	parser = pypiper.add_pypiper_args(parser, groups=["all"])
+	parser = pypiper.add_pypiper_args(parser, all_args=True)
 	args = parser.parse_args()
 	if args.sample_config is None:
 		parser.print_help()
 		return 1
 
 	# Read in yaml configs
-	series = pd.Series(yaml.load(open(args.sample_config, "r")))
+	series = yaml.load(open(args.sample_config, "r"))
 	# Create Sample object
-	if series["library"] != "DNase-seq":
+	if series["protocol"] != "DNase-seq":
 		sample = ATACseqSample(series)
 	else:
 		sample = DNaseSample(series)
@@ -490,7 +474,7 @@ def process(sample, pipe_manager, args):
 	"""
 	print("Start processing ATAC-seq sample %s." % sample.sample_name)
 
-	for path in ["sample_root"] + sample.paths.__dict__.keys():
+	for path in ["sample_root"] + list(sample.paths.__dict__.keys()):
 		try:
 			exists = os.path.exists(sample.paths[path])
 		except TypeError:
@@ -570,7 +554,7 @@ def process(sample, pipe_manager, args):
 			output_prefix=os.path.join(sample.paths.unmapped, sample.sample_name),
 			output_fastq1=sample.trimmed1 if sample.paired else sample.trimmed,
 			output_fastq2=sample.trimmed2 if sample.paired else None,
-			trim_log=sample.trimlog,
+			log=sample.trimlog,
 			cpus=args.cores,
 			adapters=pipe_manager.config.resources.adapters
 		)

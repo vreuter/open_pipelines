@@ -10,7 +10,7 @@ from argparse import ArgumentParser
 
 import pypiper
 import yaml
-from looper.models import AttributeDict
+from pep import AttributeDict
 
 
 __author__ = "Andre Rendeiro"
@@ -28,7 +28,7 @@ def main():
 		description="Drop-seq pipeline."
 	)
 	parser = arg_parser(parser)
-	parser = pypiper.add_pypiper_args(parser, groups=["all"])
+	parser = pypiper.add_pypiper_args(parser, all_args=True)
 	args = parser.parse_args()
 	if args.sample_config is None:
 		parser.print_help()

@@ -10,9 +10,7 @@ from argparse import ArgumentParser
 import yaml
 import pypiper
 from pypiper.ngstk import NGSTk
-from looper.models import AttributeDict, Sample
-
-import pandas as pd
+from pep import AttributeDict, Sample
 
 
 __author__ = "Andre Rendeiro"
@@ -25,12 +23,10 @@ __email__ = "arendeiro@cemm.oeaw.ac.at"
 __status__ = "Development"
 
 
+
 class QuantseqSample(Sample):
 	"""
-	Class to model Quant-seq samples based on the generic Sample class (itself a pandas.Series).
-
-	:param series: Pandas `Series` object.
-	:type series: pandas.Series
+	Class to model Quant-seq samples based on the generic Sample class.
 
 	:Example:
 
@@ -41,22 +37,15 @@ class QuantseqSample(Sample):
 	"""
 	__library__ = "Quant-seq"
 
-	def __init__(self, series):
-
-		# Passed series must either be a pd.Series or a daugther class
-		if not isinstance(series, pd.Series):
-			raise TypeError("Provided object is not a pandas Series.")
-		super(QuantseqSample, self).__init__(series)
-
 	def __repr__(self):
 		return "Quant-seq sample '%s'" % self.sample_name
 
-	def set_file_paths(self):
+	def set_file_paths(self, project=None):
 		"""
 		Sets the paths of all files for this sample.
 		"""
 		# Inherit paths from Sample by running Sample's set_file_paths()
-		super(QuantseqSample, self).set_file_paths()
+		super(QuantseqSample, self).set_file_paths(project)
 
 		# Files in the root of the sample dir
 		self.fastqc = os.path.join(self.paths.sample_root, self.sample_name + ".fastqc.zip")
@@ -95,7 +84,7 @@ def main():
 	args = parser.parse_args()
 
 	# Read in yaml config and create Sample object
-	sample = QuantseqSample(pd.Series(yaml.load(open(args.sample_config, "r"))))
+	sample = QuantseqSample(yaml.load(open(args.sample_config, "r")))
 
 	# Check if merged
 	if len(sample.data_source.split(" ")) > 1:
@@ -217,7 +206,7 @@ def process(sample, pipe_manager, args):
 			output_prefix=os.path.join(sample.paths.unmapped, sample.sample_name),
 			output_fastq1=sample.trimmed1 if sample.paired else sample.trimmed,
 			output_fastq2=sample.trimmed2 if sample.paired else None,
-			trim_log=sample.trimlog,
+			log=sample.trimlog,
 			cpus=args.cores,
 			adapters=pipe_manager.resources.adapters
 		)
@@ -231,11 +220,11 @@ def process(sample, pipe_manager, args):
 	# With kallisto from unmapped reads
 	pipe_manager.timestamp("Quantifying read counts with kallisto")
 	cmd = tk.kallisto(
-		inputFastq=sample.trimmed1 if sample.paired else sample.trimmed,
+		input_fastq=sample.trimmed1 if sample.paired else sample.trimmed,
 		input_fastq2=sample.trimmed1 if sample.paired else None,
 		output_dir=sample.paths.quant,
 		output_bam=sample.pseudomapped,
-		transcriptomeIndex=pipe_manager.resources.genome_index[sample.transcriptome],
+		transcriptome_index=pipe_manager.resources.genome_index[sample.transcriptome],
 		cpus=args.cores
 	)
 	pipe_manager.run(cmd, sample.kallisto_quant, shell=True, nofail=True)

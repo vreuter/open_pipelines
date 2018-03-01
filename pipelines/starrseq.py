@@ -10,9 +10,7 @@ from argparse import ArgumentParser
 import yaml
 import pypiper
 from pypiper.ngstk import NGSTk
-from looper.models import AttributeDict, Sample
-
-import pandas as pd
+from pep import AttributeDict, Sample
 
 
 __author__ = "Andre Rendeiro"
@@ -25,35 +23,30 @@ __email__ = "arendeiro@cemm.oeaw.ac.at"
 __status__ = "Development"
 
 
+
 class STARRseqSample(Sample):
 	"""
 	Class to model STARR-seq samples based on the ChIPseqSample class.
 
-	:param series: Pandas `Series` object.
-	:type series: pandas.Series
+	:param series: Collection of sample attributes.
+	:type series: Mapping | pandas.core.series.Series
 	"""
 	__library__ = "STARR-seq"
 
 	def __init__(self, series):
-
-		# Use pd.Series object to have all sample attributes
-		if not isinstance(series, pd.Series):
-			raise TypeError("Provided object is not a pandas Series.")
 		super(STARRseqSample, self).__init__(series)
-
 		self.tagmented = False
-
 		self.make_sample_dirs()
 
 	def __repr__(self):
 		return "STARR-seq sample '%s'" % self.sample_name
 
-	def set_file_paths(self):
+	def set_file_paths(self, project=None):
 		"""
 		Sets the paths of all files for this sample.
 		"""
 		# Inherit paths from Sample by running Sample's set_file_paths()
-		super(STARRseqSample, self).set_file_paths()
+		super(STARRseqSample, self).set_file_paths(project)
 
 		# Files in the root of the sample dir
 		self.fastqc = os.path.join(self.paths.sample_root, self.sample_name + ".fastqc.zip")
@@ -118,7 +111,7 @@ def main():
 		return 1
 
 	# Read in yaml config and create Sample object
-	sample = STARRseqSample(pd.Series(yaml.load(open(args.sample_config, "r"))))
+	sample = STARRseqSample(yaml.load(open(args.sample_config, "r")))
 
 	# Check if merged
 	if len(sample.data_source.split(" ")) > 1:
@@ -240,7 +233,7 @@ def process(sample, pipe_manager, args):
 			output_prefix=os.path.join(sample.paths.unmapped, sample.sample_name),
 			output_fastq1=sample.trimmed1 if sample.paired else sample.trimmed,
 			output_fastq2=sample.trimmed2 if sample.paired else None,
-			trim_log=sample.trimlog,
+			log=sample.trimlog,
 			cpus=args.cores,
 			adapters=pipe_manager.resources.adapters
 		)
@@ -341,7 +334,7 @@ def process(sample, pipe_manager, args):
 
 	# Calculate fraction of reads in peaks (FRiP)
 	pipe_manager.timestamp("Calculating fraction of reads in peaks (FRiP)")
-	cmd = tk.calculateFRiP(
+	cmd = tk.calculate_frip(
 		input_bam=sample.filtered,
 		input_bed=sample.peaks,
 		output=sample.frip
@@ -350,6 +343,7 @@ def process(sample, pipe_manager, args):
 
 	print("Finished processing sample %s." % sample.sample_name)
 	pipe_manager.stop_pipeline()
+
 
 
 if __name__ == '__main__':
